@@ -53,7 +53,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			fmt.Println("doing task map")
 			file, err := os.Open(reply.File)
 			if err != nil {
-				fmt.Printf("cannot open %v\n", reply.File)
+				fmt.Printf(":cannot open %dth file %v\n", reply.TaskId, reply.File)
 				log.Fatalf("cannot open %v", reply.File)
 
 			}
@@ -70,7 +70,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			}
 			// 生成nReduce个中间文件 命名 mr-taskId-0~9 (when nReduce=10)
 			for i := 0; i < reply.NReduce; i++ {
-				fmt.Printf("produce mr-%d-%d\n", reply.TaskId, i)
+				// fmt.Printf("produce mr-%d-%d\n", reply.TaskId, i)
 				file, _ = os.Open(fmt.Sprintf("mr-%d-%d", reply.TaskId, i))
 				enc := json.NewEncoder(file)
 				for _, kv := range kvs[i] {
