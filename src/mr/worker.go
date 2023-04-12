@@ -119,11 +119,12 @@ func Worker(mapf func(string, string) []KeyValue,
 					values = append(values, kva[i].Value)
 				}
 				res := reducef(kva[i].Key, values)
+				// 这里已经变成2了
 				if kva[i].Key == "Ab" {
 					fmt.Printf("Ab: %s\n", res)
 				}
 				fmt.Fprintf(oFile, "%v %v\n", kva[i].Key, res)
-				i = j
+				i = j - 1
 			}
 			oFile.Close()
 		}
