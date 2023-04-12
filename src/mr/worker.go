@@ -58,12 +58,14 @@ func Worker(mapf func(string, string) []KeyValue,
 
 			}
 			content, err := ioutil.ReadAll(file)
+			fmt.Printf("content length: %d\n", len(content))
 			if err != nil {
 				fmt.Printf("cannot read %v\n", reply.File)
 				log.Fatalf("cannot read %v", reply.File)
 			}
 			file.Close()
 			kva := mapf(reply.File, string(content))
+			// fmt.Printf("kva length: %d\n", len(content))
 			kvs := make([][]KeyValue, reply.NReduce)
 			for _, kv := range kva {
 				kvs[ihash(kv.Key)%reply.NReduce] = append(kvs[ihash(kv.Key)%reply.NReduce], kv)
@@ -71,7 +73,10 @@ func Worker(mapf func(string, string) []KeyValue,
 			// 生成nReduce个中间文件 命名 mr-taskId-0~9 (when nReduce=10)
 			for i := 0; i < reply.NReduce; i++ {
 				// fmt.Printf("produce mr-%d-%d\n", reply.TaskId, i)
-				file, _ = os.Open(fmt.Sprintf("mr-%d-%d", reply.TaskId, i))
+				file, err = os.Create(fmt.Sprintf("mr-%d-%d", reply.TaskId, i))
+				if err != nil {
+					fmt.Println(fmt.Sprintf("mr-%d-%d", reply.TaskId, i), err)
+				}
 				enc := json.NewEncoder(file)
 				for _, kv := range kvs[i] {
 					_ = enc.Encode(&kv)
