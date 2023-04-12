@@ -112,6 +112,7 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 		NReduce:            nReduce,
 		FilesStatus:        make([]int, len(files)),
 		MediateFilesStatus: make([]int, nReduce),
+		Status:             0,
 	}
 
 	// Your code here.

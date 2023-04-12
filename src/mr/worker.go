@@ -37,22 +37,29 @@ func ihash(key string) int {
 // Worker main/mrworker.go calls this function.
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
+	fmt.Println("start worker")
 	for {
 		// 获取任务
 		args := ExampleArgs{}
 		reply := GetTaskReply{}
 		call("Coordinator.GetTask", &args, &reply)
 		if reply.TType == 2 {
+			fmt.Println("任务已结束")
 			break
 		}
 		// 执行任务 map
+
 		if reply.TType == 0 {
+			fmt.Println("doing task map")
 			file, err := os.Open(reply.File)
 			if err != nil {
+				fmt.Printf("cannot open %v\n", reply.File)
 				log.Fatalf("cannot open %v", reply.File)
+
 			}
 			content, err := ioutil.ReadAll(file)
 			if err != nil {
+				fmt.Printf("cannot read %v\n", reply.File)
 				log.Fatalf("cannot read %v", reply.File)
 			}
 			file.Close()
@@ -63,6 +70,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			}
 			// 生成nReduce个中间文件 命名 mr-taskId-0~9 (when nReduce=10)
 			for i := 0; i < reply.NReduce; i++ {
+				fmt.Printf("produce mr-%d-%d\n", reply.TaskId, i)
 				file, _ = os.Open(fmt.Sprintf("mr-%d-%d", reply.TaskId, i))
 				enc := json.NewEncoder(file)
 				for _, kv := range kvs[i] {
@@ -72,7 +80,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			}
 		} else { // reduce
 			// 汇总
-
+			fmt.Println("doing task reduce")
 			n := reply.InputNumber
 			Y := reply.TaskId
 			kva := []KeyValue{}
@@ -117,6 +125,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			TaskId: reply.TaskId,
 		}
 		completeReply := ExampleReply{}
+		fmt.Println("complete task notity coordinator")
 		call("Coordinator.CompleteTask", &completeArgs, &completeReply)
 	}
 
