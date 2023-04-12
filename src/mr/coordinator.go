@@ -53,7 +53,7 @@ func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 			if v == 0 {
 				reply.TType = 1
 				reply.TaskId = i
-				reply.File = c.MediateFiles[i]
+				// reply.File = c.MediateFiles[i]
 				reply.NReduce = c.NReduce
 				reply.InputNumber = len(c.Files)
 				c.MediateFilesStatus[i] = 1
@@ -69,6 +69,8 @@ func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 }
 
 func (c *Coordinator) CompleteTask(args *CompleteArgs, reply *ExampleReply) error {
+	lock.Lock()
+	defer lock.Unlock()
 	if args.TType == 0 {
 		c.FilesStatus[args.TaskId] = 2
 		if check(c.FilesStatus) {
