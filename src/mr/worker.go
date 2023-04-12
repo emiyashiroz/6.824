@@ -119,6 +119,9 @@ func Worker(mapf func(string, string) []KeyValue,
 					values = append(values, kva[i].Value)
 				}
 				res := reducef(kva[i].Key, values)
+				if kva[i].Key == "Ab" {
+					fmt.Printf("Ab: %s\n", res)
+				}
 				fmt.Fprintf(oFile, "%v %v\n", kva[i].Key, res)
 				i = j
 			}
