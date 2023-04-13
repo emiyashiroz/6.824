@@ -63,9 +63,7 @@ func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 	} else {
 		reply.TType = 2
 	}
-
 	return nil
-
 }
 
 func (c *Coordinator) CompleteTask(args *CompleteArgs, reply *ExampleReply) error {
@@ -99,9 +97,9 @@ func (c *Coordinator) server() {
 	rpc.Register(c)
 	rpc.HandleHTTP()
 	//l, e := net.Listen("tcp", ":1234")
-	sockname := coordinatorSock()
-	os.Remove(sockname)
-	l, e := net.Listen("unix", sockname)
+	sockName := coordinatorSock()
+	os.Remove(sockName)
+	l, e := net.Listen("unix", sockName)
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
@@ -129,7 +127,6 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	}
 
 	// Your code here.
-
 	c.server()
 	return &c
 }

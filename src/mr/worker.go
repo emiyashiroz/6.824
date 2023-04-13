@@ -11,10 +11,10 @@ import "log"
 import "net/rpc"
 import "hash/fnv"
 
-// for sorting by key.
+// ByKey for sorting by key.
 type ByKey []KeyValue
 
-// for sorting by key.
+// Len for sorting by key.
 func (a ByKey) Len() int           { return len(a) }
 func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
@@ -26,53 +26,43 @@ type KeyValue struct {
 	Value string
 }
 
-// use ihash(key) % NReduce to choose the reduce
+// use iHash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
-func ihash(key string) int {
+func iHash(key string) int {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	return int(h.Sum32() & 0x7fffffff)
 }
 
 // Worker main/mrworker.go calls this function.
-func Worker(mapf func(string, string) []KeyValue,
-	reducef func(string, []string) string) {
-	// fmt.Println("start worker")
+func Worker(mapF func(string, string) []KeyValue,
+	reduceF func(string, []string) string) {
 	for {
 		// 获取任务
 		args := ExampleArgs{}
 		reply := GetTaskReply{}
 		call("Coordinator.GetTask", &args, &reply)
 		if reply.TType == 2 {
-			// fmt.Println("任务已结束")
 			break
 		}
 		// 执行任务 map
-
 		if reply.TType == 0 {
-			// fmt.Println("doing task map")
 			file, err := os.Open(reply.File)
 			if err != nil {
-				// fmt.Printf(":cannot open %dth file %v\n", reply.TaskId, reply.File)
-				log.Fatalf("cannot open %v", reply.File)
-
+				log.Fatalf("cannot open %v, taskId=%d, type=%d, err=%v", reply.File, reply.TaskId, reply.TType, err)
 			}
 			content, err := ioutil.ReadAll(file)
-			// fmt.Printf("content length: %d\n", len(content))
 			if err != nil {
-				// fmt.Printf("cannot read %v\n", reply.File)
 				log.Fatalf("cannot read %v", reply.File)
 			}
 			file.Close()
-			kva := mapf(reply.File, string(content))
-			// fmt.Printf("kva length: %d\n", len(content))
+			kva := mapF(reply.File, string(content))
 			kvs := make([][]KeyValue, reply.NReduce)
 			for _, kv := range kva {
-				kvs[ihash(kv.Key)%reply.NReduce] = append(kvs[ihash(kv.Key)%reply.NReduce], kv)
+				kvs[iHash(kv.Key)%reply.NReduce] = append(kvs[iHash(kv.Key)%reply.NReduce], kv)
 			}
 			// 生成nReduce个中间文件 命名 mr-taskId-0~9 (when nReduce=10)
 			for i := 0; i < reply.NReduce; i++ {
-				// fmt.Printf("produce mr-%d-%d\n", reply.TaskId, i)
 				file, err = os.Create(fmt.Sprintf("mr-%d-%d", reply.TaskId, i))
 				if err != nil {
 					fmt.Println(fmt.Sprintf("mr-%d-%d", reply.TaskId, i), err)
@@ -84,8 +74,6 @@ func Worker(mapf func(string, string) []KeyValue,
 				file.Close()
 			}
 		} else { // reduce
-			// 汇总
-			// fmt.Println("doing task reduce")
 			n := reply.InputNumber
 			Y := reply.TaskId
 			kva := []KeyValue{}
@@ -103,7 +91,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			}
 			// 排序
 			sort.Sort(ByKey(kva))
-			// reducef
+			// reduceF
 			outFile := fmt.Sprintf("mr-out-%d", Y)
 			oFile, _ := os.Create(outFile)
 			i, j := 0, 0
@@ -118,11 +106,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				for k := i; k < j; k++ {
 					values = append(values, kva[k].Value)
 				}
-				res := reducef(kva[i].Key, values)
-				// 这里已经变成2了
-				//if kva[i].Key == "Ab" {
-				//	fmt.Printf("Ab: %s\n", res)
-				//}
+				res := reduceF(kva[i].Key, values)
 				fmt.Fprintf(oFile, "%v %v\n", kva[i].Key, res)
 				i = j - 1
 			}
@@ -134,39 +118,19 @@ func Worker(mapf func(string, string) []KeyValue,
 			TaskId: reply.TaskId,
 		}
 		completeReply := ExampleReply{}
-		// fmt.Println("complete task notity coordinator")
 		call("Coordinator.CompleteTask", &completeArgs, &completeReply)
 	}
-
-	//
-	// Your worker implementation here.
-
-	// uncomment to send the Example RPC to the coordinator.
-	// CallExample()
-
 }
 
 // CallExample
 // example function to show how to make an RPC call to the coordinator.
 // the RPC argument and reply types are defined in rpc.go.
 func CallExample() {
-
-	// declare an argument structure.
 	args := ExampleArgs{}
-
-	// fill in the argument(s).
 	args.X = 99
-
-	// declare a reply structure.
 	reply := ExampleReply{}
-
-	// send the RPC request, wait for the reply.
-	// the "Coordinator.Example" tells the
-	// receiving server that we'd like to call
-	// the Example() method of struct Coordinator.
 	ok := call("Coordinator.Example", &args, &reply)
 	if ok {
-		// reply.Y should be 100.
 		fmt.Printf("reply.Y %v\n", reply.Y)
 	} else {
 		fmt.Printf("call failed!\n")
@@ -176,16 +140,16 @@ func CallExample() {
 // send an RPC request to the coordinator, wait for the response.
 // usually returns true.
 // returns false if something goes wrong.
-func call(rpcname string, args interface{}, reply interface{}) bool {
+func call(rpcName string, args interface{}, reply interface{}) bool {
 	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
-	sockname := coordinatorSock()
-	c, err := rpc.DialHTTP("unix", sockname)
+	sockName := coordinatorSock()
+	c, err := rpc.DialHTTP("unix", sockName)
 	if err != nil {
 		log.Fatal("dialing:", err)
 	}
 	defer c.Close()
 
-	err = c.Call(rpcname, args, reply)
+	err = c.Call(rpcName, args, reply)
 	if err == nil {
 		return true
 	}
