@@ -71,7 +71,7 @@ func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 
 // TimeOutCheck 任务超时检查, 超时: 需要重置任务
 func (c *Coordinator) TimeOutCheck(tType, taskId int) {
-	time.Sleep(time.Duration(30 * time.Second)) // 等待15s
+	time.Sleep(time.Duration(100 * time.Second)) // 等待15s
 	lock.Lock()
 	defer lock.Unlock()
 	if tType == 0 {
