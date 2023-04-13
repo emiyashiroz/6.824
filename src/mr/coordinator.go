@@ -63,6 +63,7 @@ func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 		}
 	} else {
 		reply.TType = 2
+		reply.NReduce = c.NReduce
 	}
 	return nil
 }
