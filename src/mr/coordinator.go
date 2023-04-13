@@ -42,6 +42,7 @@ func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 				reply.TType = 0
 				reply.TaskId = i
 				reply.File = c.Files[i]
+				log.Println(i, ": ", reply.File)
 				reply.NReduce = c.NReduce
 				reply.InputNumber = len(c.Files)
 				c.FilesStatus[i] = 1
