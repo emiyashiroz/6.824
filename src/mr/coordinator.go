@@ -42,29 +42,27 @@ func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 				reply.TType = 0
 				reply.TaskId = i
 				reply.File = c.Files[i]
-				log.Println(i, ": ", reply.File)
 				reply.NReduce = c.NReduce
 				reply.InputNumber = len(c.Files)
 				c.FilesStatus[i] = 1
 				return nil
 			}
 		}
+		reply.TType = 2
 	} else if c.Status == 1 {
 		for i, v := range c.MediateFilesStatus {
 			if v == 0 {
 				reply.TType = 1
 				reply.TaskId = i
-				log.Println(i, "reduce: ", reply.TaskId)
-				// reply.File = c.MediateFiles[i]
 				reply.NReduce = c.NReduce
 				reply.InputNumber = len(c.Files)
 				c.MediateFilesStatus[i] = 1
 				return nil
 			}
 		}
+		reply.TType = 3
 	} else {
-		reply.TType = 2
-		reply.NReduce = c.NReduce
+		reply.TType = 4
 	}
 	return nil
 }
@@ -75,13 +73,11 @@ func (c *Coordinator) CompleteTask(args *CompleteArgs, reply *ExampleReply) erro
 	if args.TType == 0 {
 		c.FilesStatus[args.TaskId] = 2
 		if check(c.FilesStatus) {
-			log.Println("c.Status=1")
 			c.Status = 1
 		}
 	} else {
 		c.MediateFilesStatus[args.TaskId] = 2
 		if check(c.MediateFilesStatus) {
-			log.Println("c.Status=2")
 			c.Status = 2
 		}
 	}

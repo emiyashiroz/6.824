@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"time"
 )
 import "log"
 import "net/rpc"
@@ -42,15 +43,17 @@ func Worker(mapF func(string, string) []KeyValue,
 		args := ExampleArgs{}
 		reply := GetTaskReply{}
 		call("Coordinator.GetTask", &args, &reply)
-		if reply.TType == 2 {
+		if reply.TType == 4 {
 			break
+		}
+		if reply.TType == 2 || reply.TType == 3 {
+			time.Sleep(1)
+			continue
 		}
 		// 执行任务 map
 		if reply.TType == 0 {
 			file, err := os.Open(reply.File)
 			if err != nil {
-				log.Println(reply.File)
-				log.Println(reply.NReduce)
 				log.Fatalf("cannot open %v, taskId=%d, type=%d, err=%v", reply.File, reply.TaskId, reply.TType, err)
 			}
 			content, err := ioutil.ReadAll(file)
