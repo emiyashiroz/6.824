@@ -54,6 +54,7 @@ func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 			if v == 0 {
 				reply.TType = 1
 				reply.TaskId = i
+				log.Println(i, "reduce: ", reply.TaskId)
 				// reply.File = c.MediateFiles[i]
 				reply.NReduce = c.NReduce
 				reply.InputNumber = len(c.Files)
