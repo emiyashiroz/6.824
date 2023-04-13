@@ -37,30 +37,30 @@ func ihash(key string) int {
 // Worker main/mrworker.go calls this function.
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
-	fmt.Println("start worker")
+	// fmt.Println("start worker")
 	for {
 		// 获取任务
 		args := ExampleArgs{}
 		reply := GetTaskReply{}
 		call("Coordinator.GetTask", &args, &reply)
 		if reply.TType == 2 {
-			fmt.Println("任务已结束")
+			// fmt.Println("任务已结束")
 			break
 		}
 		// 执行任务 map
 
 		if reply.TType == 0 {
-			fmt.Println("doing task map")
+			// fmt.Println("doing task map")
 			file, err := os.Open(reply.File)
 			if err != nil {
-				fmt.Printf(":cannot open %dth file %v\n", reply.TaskId, reply.File)
+				// fmt.Printf(":cannot open %dth file %v\n", reply.TaskId, reply.File)
 				log.Fatalf("cannot open %v", reply.File)
 
 			}
 			content, err := ioutil.ReadAll(file)
-			fmt.Printf("content length: %d\n", len(content))
+			// fmt.Printf("content length: %d\n", len(content))
 			if err != nil {
-				fmt.Printf("cannot read %v\n", reply.File)
+				// fmt.Printf("cannot read %v\n", reply.File)
 				log.Fatalf("cannot read %v", reply.File)
 			}
 			file.Close()
@@ -85,7 +85,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			}
 		} else { // reduce
 			// 汇总
-			fmt.Println("doing task reduce")
+			// fmt.Println("doing task reduce")
 			n := reply.InputNumber
 			Y := reply.TaskId
 			kva := []KeyValue{}
@@ -116,13 +116,13 @@ func Worker(mapf func(string, string) []KeyValue,
 				}
 				values := []string{}
 				for k := i; k < j; k++ {
-					values = append(values, kva[i].Value)
+					values = append(values, kva[k].Value)
 				}
 				res := reducef(kva[i].Key, values)
 				// 这里已经变成2了
-				if kva[i].Key == "Ab" {
-					fmt.Printf("Ab: %s\n", res)
-				}
+				//if kva[i].Key == "Ab" {
+				//	fmt.Printf("Ab: %s\n", res)
+				//}
 				fmt.Fprintf(oFile, "%v %v\n", kva[i].Key, res)
 				i = j - 1
 			}
@@ -134,7 +134,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			TaskId: reply.TaskId,
 		}
 		completeReply := ExampleReply{}
-		fmt.Println("complete task notity coordinator")
+		// fmt.Println("complete task notity coordinator")
 		call("Coordinator.CompleteTask", &completeArgs, &completeReply)
 	}
 
