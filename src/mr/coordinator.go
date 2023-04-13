@@ -71,7 +71,7 @@ func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 
 // TimeOutCheck 任务超时检查, 超时: 需要重置任务
 func (c *Coordinator) TimeOutCheck(tType, taskId int) {
-	time.Sleep(time.Duration(10 * time.Second)) // 等待15s
+	time.Sleep(time.Duration(50 * time.Second)) // 等待15s
 	lock.Lock()
 	defer lock.Unlock()
 	if tType == 0 {
@@ -89,17 +89,17 @@ func (c *Coordinator) CompleteTask(args *CompleteArgs, reply *ExampleReply) erro
 	lock.Lock()
 	defer lock.Unlock()
 	if args.TType == 0 {
-		if c.FilesStatus[args.TaskId] != 1 {
-			return nil
-		}
+		//if c.FilesStatus[args.TaskId] != 1 {
+		//	return nil
+		//}
 		c.FilesStatus[args.TaskId] = 2
 		if check(c.FilesStatus) {
 			c.Status = 1
 		}
 	} else {
-		if c.MediateFilesStatus[args.TaskId] != 1 {
-			return nil
-		}
+		//if c.MediateFilesStatus[args.TaskId] != 1 {
+		//	return nil
+		//}
 		c.MediateFilesStatus[args.TaskId] = 2
 		if check(c.MediateFilesStatus) {
 			c.Status = 2
