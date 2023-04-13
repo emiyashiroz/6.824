@@ -103,7 +103,10 @@ func Worker(mapF func(string, string) []KeyValue,
 			// reduceF
 			// outFile := fmt.Sprintf("mr-out-%d", Y)
 			// oFile, _ := os.Create(outFile)
-			file, _ := ioutil.TempFile("", fmt.Sprintf("tmp%d", rand.Int()))
+			file, err := ioutil.TempFile("", fmt.Sprintf("tmp%d", rand.Int()))
+			if err != nil {
+				log.Println("tempfile create err", err)
+			}
 			i, j := 0, 0
 			for ; i < len(kva); i++ {
 				j = i + 1
@@ -117,10 +120,16 @@ func Worker(mapF func(string, string) []KeyValue,
 					values = append(values, kva[k].Value)
 				}
 				res := reduceF(kva[i].Key, values)
-				fmt.Fprintf(file, "%v %v\n", kva[i].Key, res)
+				_, err = fmt.Fprintf(file, "%v %v\n", kva[i].Key, res)
+				if err != nil {
+					log.Println("tempfile write err", err)
+				}
 				i = j - 1
 			}
-			os.Rename("tmp", fmt.Sprintf("mr-out-%d", Y))
+			err = os.Rename("tmp", fmt.Sprintf("mr-out-%d", Y))
+			if err != nil {
+				log.Println("tempfile rename err", err)
+			}
 			// file.Close()
 		}
 		// 结束通知
