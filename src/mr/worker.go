@@ -119,7 +119,7 @@ func Worker(mapF func(string, string) []KeyValue,
 				for k := i; k < j; k++ {
 					values = append(values, kva[k].Value)
 				}
-				res := reduceF(kva[i].Key, values)
+				res := reduceF(kva[i].Key, values) // 这里崩溃
 				_, err = fmt.Fprintf(file, "%v %v\n", kva[i].Key, res)
 				if err != nil {
 					log.Println("tempfile write err", err)
