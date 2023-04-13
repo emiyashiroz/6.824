@@ -74,11 +74,13 @@ func (c *Coordinator) CompleteTask(args *CompleteArgs, reply *ExampleReply) erro
 	if args.TType == 0 {
 		c.FilesStatus[args.TaskId] = 2
 		if check(c.FilesStatus) {
+			log.Println("c.Status=1")
 			c.Status = 1
 		}
 	} else {
 		c.MediateFilesStatus[args.TaskId] = 2
 		if check(c.MediateFilesStatus) {
+			log.Println("c.Status=2")
 			c.Status = 2
 		}
 	}
