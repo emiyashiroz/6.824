@@ -126,7 +126,7 @@ func Worker(mapF func(string, string) []KeyValue,
 				}
 				i = j - 1
 			}
-			err = os.Rename("tmp", fmt.Sprintf("mr-out-%d", Y))
+			err = os.Rename(file.Name(), fmt.Sprintf("mr-out-%d", Y))
 			if err != nil {
 				log.Println("tempfile rename err", err)
 			}
