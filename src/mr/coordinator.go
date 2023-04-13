@@ -36,14 +36,14 @@ func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 	lock.Lock()
 	defer lock.Unlock()
+	reply.NReduce = c.NReduce
+	reply.InputNumber = len(c.Files)
 	if c.Status == 0 {
 		for i, v := range c.FilesStatus {
 			if v == 0 {
 				reply.TType = 0
 				reply.TaskId = i
 				reply.File = c.Files[i]
-				reply.NReduce = c.NReduce
-				reply.InputNumber = len(c.Files)
 				c.FilesStatus[i] = 1
 				return nil
 			}
@@ -54,8 +54,6 @@ func (c *Coordinator) GetTask(args *ExampleArgs, reply *GetTaskReply) error {
 			if v == 0 {
 				reply.TType = 1
 				reply.TaskId = i
-				reply.NReduce = c.NReduce
-				reply.InputNumber = len(c.Files)
 				c.MediateFilesStatus[i] = 1
 				return nil
 			}

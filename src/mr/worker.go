@@ -43,9 +43,11 @@ func Worker(mapF func(string, string) []KeyValue,
 		args := ExampleArgs{}
 		reply := GetTaskReply{}
 		call("Coordinator.GetTask", &args, &reply)
+		// 已经执行完毕
 		if reply.TType == 4 {
 			break
 		}
+		// 任务已经分配完
 		if reply.TType == 2 || reply.TType == 3 {
 			time.Sleep(1)
 			continue
@@ -70,7 +72,7 @@ func Worker(mapF func(string, string) []KeyValue,
 			for i := 0; i < reply.NReduce; i++ {
 				file, err = os.Create(fmt.Sprintf("mr-%d-%d", reply.TaskId, i))
 				if err != nil {
-					fmt.Println(fmt.Sprintf("mr-%d-%d", reply.TaskId, i), err)
+					log.Fatalf(fmt.Sprintf("mr-%d-%d", reply.TaskId, i), err)
 				}
 				enc := json.NewEncoder(file)
 				for _, kv := range kvs[i] {
@@ -81,7 +83,7 @@ func Worker(mapF func(string, string) []KeyValue,
 		} else { // reduce
 			n := reply.InputNumber
 			Y := reply.TaskId
-			kva := []KeyValue{}
+			var kva []KeyValue
 			for i := 0; i < n; i++ {
 				file, _ := os.Open(fmt.Sprintf("mr-%d-%d", i, Y))
 				dec := json.NewDecoder(file)
@@ -102,12 +104,12 @@ func Worker(mapF func(string, string) []KeyValue,
 			i, j := 0, 0
 			for ; i < len(kva); i++ {
 				j = i + 1
+				values := []string{}
 				for ; j < len(kva); j++ {
 					if kva[i].Key != kva[j].Key {
 						break
 					}
 				}
-				values := []string{}
 				for k := i; k < j; k++ {
 					values = append(values, kva[k].Value)
 				}
