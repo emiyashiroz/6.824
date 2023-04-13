@@ -79,7 +79,7 @@ func (c *Coordinator) TimeOutCheck(tType, taskId int) {
 		}
 	} else {
 		if c.MediateFilesStatus[taskId] != 2 {
-			c.FilesStatus[taskId] = 0
+			c.MediateFilesStatus[taskId] = 0
 		}
 	}
 }
