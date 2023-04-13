@@ -49,6 +49,7 @@ func Worker(mapF func(string, string) []KeyValue,
 		if reply.TType == 0 {
 			file, err := os.Open(reply.File)
 			if err != nil {
+				log.Println(reply.File)
 				log.Fatalf("cannot open %v, taskId=%d, type=%d, err=%v", reply.File, reply.TaskId, reply.TType, err)
 			}
 			content, err := ioutil.ReadAll(file)
