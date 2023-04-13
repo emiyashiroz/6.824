@@ -142,37 +142,37 @@ else
   failed_any=1
 fi
 #
-#wait
-#
-##########################################################
-#echo '***' Starting map parallelism test.
-#
-#rm -f mr-*
-#
-#maybe_quiet $TIMEOUT ../mrcoordinator ../pg*txt &
-#sleep 1
-#
-#maybe_quiet $TIMEOUT ../mrworker ../../mrapps/mtiming.so &
-#maybe_quiet $TIMEOUT ../mrworker ../../mrapps/mtiming.so
-#
-#NT=`cat mr-out* | grep '^times-' | wc -l | sed 's/ //g'`
-#if [ "$NT" != "2" ]
-#then
-#  echo '---' saw "$NT" workers rather than 2
-#  echo '---' map parallelism test: FAIL
-#  failed_any=1
-#fi
-#
-#if cat mr-out* | grep '^parallel.* 2' > /dev/null
-#then
-#  echo '---' map parallelism test: PASS
-#else
-#  echo '---' map workers did not run in parallel
-#  echo '---' map parallelism test: FAIL
-#  failed_any=1
-#fi
-#
-#wait
+wait
+
+#########################################################
+echo '***' Starting map parallelism test.
+
+rm -f mr-*
+
+maybe_quiet $TIMEOUT ../mrcoordinator ../pg*txt &
+sleep 1
+
+maybe_quiet $TIMEOUT ../mrworker ../../mrapps/mtiming.so &
+maybe_quiet $TIMEOUT ../mrworker ../../mrapps/mtiming.so
+
+NT=`cat mr-out* | grep '^times-' | wc -l | sed 's/ //g'`
+if [ "$NT" != "2" ]
+then
+  echo '---' saw "$NT" workers rather than 2
+  echo '---' map parallelism test: FAIL
+  failed_any=1
+fi
+
+if cat mr-out* | grep '^parallel.* 2' > /dev/null
+then
+  echo '---' map parallelism test: PASS
+else
+  echo '---' map workers did not run in parallel
+  echo '---' map parallelism test: FAIL
+  failed_any=1
+fi
+
+wait
 #
 #
 ##########################################################
