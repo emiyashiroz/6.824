@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"sort"
 	"time"
@@ -102,7 +103,7 @@ func Worker(mapF func(string, string) []KeyValue,
 			// reduceF
 			// outFile := fmt.Sprintf("mr-out-%d", Y)
 			// oFile, _ := os.Create(outFile)
-			file, _ := ioutil.TempFile(".", "tmp")
+			file, _ := ioutil.TempFile("", fmt.Sprintf("tmp%d", rand.Int()))
 			i, j := 0, 0
 			for ; i < len(kva); i++ {
 				j = i + 1
@@ -120,7 +121,7 @@ func Worker(mapF func(string, string) []KeyValue,
 				i = j - 1
 			}
 			os.Rename("tmp", fmt.Sprintf("mr-out-%d", Y))
-			file.Close()
+			// file.Close()
 		}
 		// 结束通知
 		completeArgs := CompleteArgs{
