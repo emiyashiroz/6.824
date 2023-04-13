@@ -199,29 +199,29 @@ fi
 wait
 #
 ##########################################################
-#echo '***' Starting job count test.
-#
-#rm -f mr-*
-#
-#maybe_quiet $TIMEOUT ../mrcoordinator ../pg*txt  &
-#sleep 1
-#
-#maybe_quiet $TIMEOUT ../mrworker ../../mrapps/jobcount.so &
-#maybe_quiet $TIMEOUT ../mrworker ../../mrapps/jobcount.so
-#maybe_quiet $TIMEOUT ../mrworker ../../mrapps/jobcount.so &
-#maybe_quiet $TIMEOUT ../mrworker ../../mrapps/jobcount.so
-#
-#NT=`cat mr-out* | awk '{print $2}'`
-#if [ "$NT" -eq "8" ]
-#then
-#  echo '---' job count test: PASS
-#else
-#  echo '---' map jobs ran incorrect number of times "($NT != 8)"
-#  echo '---' job count test: FAIL
-#  failed_any=1
-#fi
-#
-#wait
+echo '***' Starting job count test.
+
+rm -f mr-*
+
+maybe_quiet $TIMEOUT ../mrcoordinator ../pg*txt  &
+sleep 1
+
+maybe_quiet $TIMEOUT ../mrworker ../../mrapps/jobcount.so &
+maybe_quiet $TIMEOUT ../mrworker ../../mrapps/jobcount.so
+maybe_quiet $TIMEOUT ../mrworker ../../mrapps/jobcount.so &
+maybe_quiet $TIMEOUT ../mrworker ../../mrapps/jobcount.so
+
+NT=`cat mr-out* | awk '{print $2}'`
+if [ "$NT" -eq "8" ]
+then
+  echo '---' job count test: PASS
+else
+  echo '---' map jobs ran incorrect number of times "($NT != 8)"
+  echo '---' job count test: FAIL
+  failed_any=1
+fi
+
+wait
 #
 ##########################################################
 ## test whether any worker or coordinator exits before the
