@@ -87,7 +87,6 @@ func Worker(mapF func(string, string) []KeyValue,
 			var kva []KeyValue
 			for i := 0; i < n; i++ {
 				file, _ := os.Open(fmt.Sprintf("mr-%d-%d", i, Y))
-
 				dec := json.NewDecoder(file)
 				for {
 					var kv KeyValue
@@ -101,8 +100,6 @@ func Worker(mapF func(string, string) []KeyValue,
 			// 排序
 			sort.Sort(ByKey(kva))
 			// reduceF
-			// outFile := fmt.Sprintf("mr-out-%d", Y)
-			// oFile, _ := os.Create(outFile)
 			file, err := ioutil.TempFile("", fmt.Sprintf("tmp%d", rand.Int()))
 			if err != nil {
 				log.Println("tempfile create err", err)
@@ -130,7 +127,6 @@ func Worker(mapF func(string, string) []KeyValue,
 			if err != nil {
 				log.Println("tempfile rename err", err)
 			}
-			// file.Close()
 		}
 		// 结束通知
 		completeArgs := CompleteArgs{
