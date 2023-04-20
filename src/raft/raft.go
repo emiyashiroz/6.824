@@ -18,7 +18,7 @@ package raft
 //
 
 import (
-	"fmt"
+	//"//fmt"
 	//	"bytes"
 	"math/rand"
 	"sync"
@@ -201,14 +201,14 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
 	// 投票规则 1.首先判断currentTerm是不是大于自己的, 不是直接拒绝
 	// 2.是的话看是否已经投过票了
-	fmt.Printf("%d号服务器收到来自%d号服务器的投票请求\n", rf.me, args.CandidateId)
+	//fmt.Printf("%d号服务器收到来自%d号服务器的投票请求\n", rf.me, args.CandidateId)
 	if args.Term <= rf.currentTerm {
 		reply.VoteGranted = false
 		reply.Term = rf.currentTerm
 		return
 	}
 
-	fmt.Printf("%d号服务器投票给%d号服务器\n", rf.me, args.CandidateId)
+	//fmt.Printf("%d号服务器投票给%d号服务器\n", rf.me, args.CandidateId)
 	rf.currentTerm = args.Term
 	reply.Term = args.Term
 	reply.VoteGranted = true
@@ -245,7 +245,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 // that the caller passes the address of the reply struct with &, not
 // the struct itself.
 func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool {
-	fmt.Printf("%d号服务器向%d号服务器发送投票请求\n", rf.me, server)
+	//fmt.Printf("%d号服务器向%d号服务器发送投票请求\n", rf.me, server)
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
 	if reply.VoteGranted {
 		rf.chVotes <- true
@@ -301,7 +301,7 @@ func (rf *Raft) ticker() {
 		// Check if a leader election should be started.
 		for rf.elect {
 			rf.chVotes = make(chan bool, len(rf.peers))
-			fmt.Println(rf.me, ": ", "开始选举")
+			//fmt.Println(rf.me, ": ", "开始选举")
 			votes := 0 // 选票数
 			rf.votedFor = rf.me
 			rf.curRole = 2 // 转成候选者
@@ -322,22 +322,22 @@ func (rf *Raft) ticker() {
 			time.Sleep(time.Duration(ms) * time.Millisecond)
 			// 如果这期间收到了大于等于节点currentTerm的心跳, elect中途会被改变
 			if !rf.elect {
-				fmt.Println(rf.me, ": ", "收到了大于等于节点currentTerm的心跳")
+				//fmt.Println(rf.me, ": ", "收到了大于等于节点currentTerm的心跳")
 				continue
 			}
 			// 判断选票
 			close(rf.chVotes)
 			for _ = range rf.chVotes {
-				fmt.Println(rf.me, ": ", "得到一票")
+				//fmt.Println(rf.me, ": ", "得到一票")
 				votes++
 			}
-			fmt.Println(rf.me, ": ", "得到", votes+1, "票")
+			//fmt.Println(rf.me, ": ", "得到", votes+1, "票")
 			// 当选, 否则继续选举
 			if votes+1 > (len(rf.peers)-1)/2 {
 				rf.elect = false
 				rf.curRole = 1
 				// 立即发送心跳
-				fmt.Println(rf.me, ": ", "当选立即发送心跳")
+				//fmt.Println(rf.me, ": ", "当选立即发送心跳")
 				for i, _ := range rf.peers {
 					if i == rf.me {
 						continue
@@ -355,12 +355,12 @@ func (rf *Raft) ticker() {
 		// milliseconds.
 		// 心跳超时
 		rf.heart = false
-		fmt.Println(rf.me, ": ", "开始心跳超时")
+		//fmt.Println(rf.me, ": ", "开始心跳超时")
 		time.Sleep(time.Duration(150) * time.Millisecond)
 		// 判断是否需要选举
 		rf.elect = rf.curRole == 0 && !rf.heart
 		if rf.elect {
-			fmt.Println(rf.me, "超时未收到心跳")
+			//fmt.Println(rf.me, "超时未收到心跳")
 			rf.curRole = 2
 		}
 		// Leader发送心跳
