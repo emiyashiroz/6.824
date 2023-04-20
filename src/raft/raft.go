@@ -173,10 +173,13 @@ type AppendEntriesReply struct {
 
 // AppendEntries handler
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
-	rf.heart = true
+	// 收到了来自leader的心跳
 	if args.Term >= rf.currentTerm {
+		rf.heart = true
 		rf.elect = false
+		return
 	}
+	reply.Term = rf.currentTerm
 }
 
 // AppendEntries send
@@ -294,17 +297,13 @@ func (rf *Raft) ticker() {
 		// Your code here (2A)
 		// Check if a leader election should be started.
 		for rf.elect {
-			res := make([]bool, len(rf.peers))
-			res[rf.me] = true
-			votes := 0
+			votes := 0 // 选票数
 			rf.votedFor = rf.me
 			rf.curRole = 2 // 转成候选者
 			rf.currentTerm = rf.currentTerm + 1
 			args := &RequestVoteArgs{
-				Term:         rf.currentTerm,
-				CandidateId:  rf.me,
-				lastLogIndex: 0, // todo:
-				lastLogTerm:  0,
+				Term:        rf.currentTerm,
+				CandidateId: rf.me,
 			}
 			reply := &RequestVoteReply{}
 			for i, _ := range rf.peers {
@@ -325,7 +324,7 @@ func (rf *Raft) ticker() {
 				votes++
 			}
 			// 当选, 否则继续选举
-			if votes > (len(rf.peers)-1)/2 {
+			if votes+1 > (len(rf.peers)-1)/2 {
 				rf.elect = false
 				rf.curRole = 1
 				// 立即发送心跳
@@ -347,7 +346,22 @@ func (rf *Raft) ticker() {
 		// 心跳超时
 		rf.heart = false
 		time.Sleep(time.Duration(50) * time.Millisecond)
-		rf.elect = !rf.heart
+		// 判断是否需要选举
+		rf.elect = rf.curRole == 0 && !rf.heart
+		// Leader发送心跳
+		if rf.curRole == 1 {
+			for i, _ := range rf.peers {
+				if i == rf.me {
+					continue
+				}
+				args := &AppendEntriesArgs{
+					Term:     rf.currentTerm,
+					LeaderId: rf.me,
+				}
+				reply := &AppendEntriesReply{}
+				go rf.SendAppendEntries(i, args, reply)
+			}
+		}
 	}
 }
 
@@ -374,6 +388,9 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.readPersist(persister.ReadRaftState())
 	rf.chVotes = make(chan bool, len(rf.peers))
 	rf.votedFor = -1
+	rf.elect = false
+	rf.curRole = 0
+	rf.heart = false
 	// start ticker goroutine to start elections
 	go rf.ticker()
 
