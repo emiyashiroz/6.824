@@ -33,8 +33,8 @@ import (
 // tester) on the same server, via the applyCh passed to Make(). set
 // CommandValid to true to indicate that the ApplyMsg contains a newly
 // committed log entry.
-//
-// in part 2D you'll want to send other kinds of messages (e.g.,
+
+// ApplyMsg in part 2D you'll want to send other kinds of messages (e.g.,
 // snapshots) on the applyCh, but set CommandValid to false for these
 // other uses.
 type ApplyMsg struct {
@@ -52,7 +52,7 @@ type ApplyMsg struct {
 type LogEntry struct {
 }
 
-// A Go object implementing a single Raft peer.
+// Raft A Go object implementing a single Raft peer.
 type Raft struct {
 	mu        sync.Mutex          // Lock to protect shared access to this peer's state
 	peers     []*labrpc.ClientEnd // RPC end points of all peers
@@ -80,7 +80,7 @@ type Raft struct {
 	// state a Raft server must maintain.
 }
 
-// return currentTerm and whether this server
+// GetState return currentTerm and whether this server
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
 
@@ -130,7 +130,7 @@ func (rf *Raft) readPersist(data []byte) {
 	// }
 }
 
-// the service says it has created a snapshot that has
+// Snapshot the service says it has created a snapshot that has
 // all info up to and including index. this means the
 // service no longer needs the log through (and including)
 // that index. Raft should now trim its log as much as possible.
@@ -139,7 +139,7 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 
 }
 
-// example RequestVote RPC arguments structure.
+// RequestVoteArgs example RequestVote RPC arguments structure.
 // field names must start with capital letters!
 type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
@@ -149,7 +149,7 @@ type RequestVoteArgs struct {
 	lastLogTerm  int
 }
 
-// example RequestVote RPC reply structure.
+// RequestVoteReply example RequestVote RPC reply structure.
 // field names must start with capital letters!
 type RequestVoteReply struct {
 	// Your data here (2A).
@@ -183,24 +183,20 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	reply.Term = rf.currentTerm
 }
 
-// SendAppendEntries
 func (rf *Raft) SendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
 	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
+	// 发现其他节点的term已经大于该leader节点的term, 回退到follower
+	if reply.Term > rf.currentTerm {
+		rf.curRole = 0
+	}
 	return ok
 }
 
-func max(t1, t2 int) int {
-	if t1 > t2 {
-		return t1
-	}
-	return t2
-}
-
-// example RequestVote RPC handler.
+// RequestVote RequestVote RPC handler.
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
 	// 投票规则 1.首先判断currentTerm是不是大于自己的, 不是直接拒绝
-	// 2.是的话看是否已经投过票了
+	// 2.是的话看更新
 	//fmt.Printf("%d号服务器收到来自%d号服务器的投票请求\n", rf.me, args.CandidateId)
 	if args.Term <= rf.currentTerm {
 		reply.VoteGranted = false
@@ -260,8 +256,8 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 // command will ever be committed to the Raft log, since the leader
 // may fail or lose an election. even if the Raft instance has been killed,
 // this function should return gracefully.
-//
-// the first return value is the index that the command will appear at
+
+// Start the first return value is the index that the command will appear at
 // if it's ever committed. the second return value is the current
 // term. the third return value is true if this server believes it is
 // the leader.
@@ -279,8 +275,8 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 // but it does call the Kill() method. your code can use killed() to
 // check whether Kill() has been called. the use of atomic avoids the
 // need for a lock.
-//
-// the issue is that long-running goroutines use memory and may chew
+
+// Kill the issue is that long-running goroutines use memory and may chew
 // up CPU time, perhaps causing later tests to fail and generating
 // confusing debug output. any goroutine with a long-running loop
 // should call killed() to check whether it should stop.
@@ -330,7 +326,7 @@ func (rf *Raft) leader() {
 			LeaderId: rf.me,
 		}
 		reply := &AppendEntriesReply{}
-		go rf.SendAppendEntries(i, args, reply) // todo 这里如果reply的term大于自己的term会回到follower
+		go rf.SendAppendEntries(i, args, reply) // 这里如果reply的term大于自己的term会回到follower
 	}
 	time.Sleep(time.Duration(150) * time.Millisecond)
 }
@@ -376,7 +372,7 @@ func (rf *Raft) candidate() {
 	}
 }
 
-// the service or tester wants to create a Raft server. the ports
+// Make the service or tester wants to create a Raft server. the ports
 // of all the Raft servers (including this one) are in peers[]. this
 // server's port is peers[me]. all the servers' peers[] arrays
 // have the same order. persister is a place for this server to
