@@ -18,6 +18,7 @@ package raft
 //
 
 import (
+	"fmt"
 	//	"bytes"
 	"math/rand"
 	"sync"
@@ -50,6 +51,9 @@ type ApplyMsg struct {
 }
 
 type LogEntry struct {
+	Index   int
+	Term    int
+	Command interface{}
 }
 
 // Raft A Go object implementing a single Raft peer.
@@ -72,10 +76,12 @@ type Raft struct {
 	nextIndex  []int
 	matchIndex []int
 	// customed
-	curRole int    // 当前角色 0: Follower; 1: Leader; 2: Candidate
-	heart   bool   // 是否收到心跳
-	elect   bool   // 判断是否开启选举
-	voteRes []bool // 收集选票的通道
+	curRole          int    // 当前角色 0: Follower; 1: Leader; 2: Candidate
+	heart            bool   // 是否收到心跳
+	elect            bool   // 判断是否开启选举
+	voteRes          []bool // 收集选票的通道
+	appendEntriesRes []bool // 日志复制结果
+	applyCh          chan ApplyMsg
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
 }
@@ -174,22 +180,93 @@ type AppendEntriesReply struct {
 // AppendEntries handler
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	// 收到了来自leader的心跳
-	if args.Term >= rf.currentTerm {
-		rf.heart = true
-		rf.curRole = 0
-		rf.currentTerm = args.Term
+	// 心跳逻辑
+	if args.Entries == nil {
+		if args.Term >= rf.currentTerm {
+			rf.heart = true
+			rf.curRole = 0
+			rf.currentTerm = args.Term
+			return
+		}
+		reply.Term = rf.currentTerm
 		return
 	}
-	reply.Term = rf.currentTerm
+	// logEntries 逻辑5.1
+	if args.Term < rf.currentTerm {
+		reply.Term = rf.currentTerm
+		reply.Success = false
+		return
+	}
+	reply.Term = args.Term
+	// 5.3 没有preLogIndex这条Log
+	if len(rf.logs) < args.PrevLogIndex {
+		reply.Success = false
+		return
+	}
+	// 5.3 存在但是term不一致 // 要删除这之后的
+	if args.PrevLogIndex != 0 && rf.logs[args.PrevLogIndex-1].Term != args.PrevLogTerm {
+		rf.logs = rf.logs[:args.PrevLogIndex-1]
+		reply.Success = false
+		return
+	}
+	// 一致, 更新commitIndex
+	if args.LeaderCommit > rf.commitIndex {
+		rf.commitIndex = min(args.LeaderCommit, len(rf.logs))
+	}
+	// 一致, 复制prevLogIndex后面所有的
+	rf.logs = append(rf.logs, args.Entries[args.PrevLogIndex:]...)
+	rf.commitIndex = len(rf.logs)
+	for i := args.PrevLogIndex + 1; i <= len(rf.logs); i++ {
+		applyMsg := ApplyMsg{
+			CommandValid: true,
+			Command:      rf.logs[i-1].Command,
+			CommandIndex: i,
+		}
+		// fmt.Println("follower send applyMsg:", applyMsg.Command, applyMsg.CommandIndex)
+		rf.applyCh <- applyMsg
+	}
+	reply.Success = true
+}
+
+func min(n1, n2 int) int {
+	if n1 < n2 {
+		return n1
+	}
+	return n2
 }
 
 func (rf *Raft) SendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
-	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
-	// 发现其他节点的term已经大于该leader节点的term, 回退到follower
-	if reply.Term > rf.currentTerm {
-		rf.curRole = 0
+	fmt.Printf("SendAppendEntries server: %d, entries: %d\n", server, len(args.Entries))
+	// 这是心跳
+	if len(args.Entries) == 0 {
+		ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
+		// 发现其他节点的term已经大于该leader节点的term, 回退到follower
+		if reply.Term > rf.currentTerm {
+			rf.curRole = 0
+		}
+		return ok
 	}
-	return ok
+	// 不成功一直重试
+	for reply.Success == false {
+		args.PrevLogIndex = rf.nextIndex[server]
+		if args.PrevLogIndex == 0 {
+			args.PrevLogTerm = rf.currentTerm
+		} else {
+			args.PrevLogTerm = rf.logs[args.PrevLogIndex-1].Term
+		}
+		rf.peers[server].Call("Raft.AppendEntries", args, reply)
+		if reply.Term > rf.currentTerm {
+			rf.curRole = 0
+			break
+		}
+		if reply.Success == false {
+			rf.nextIndex[server] = rf.nextIndex[server] - 1
+		}
+		time.Sleep(time.Duration(150) * time.Millisecond)
+	}
+	rf.nextIndex[server] = len(rf.logs)
+	rf.appendEntriesRes[server] = true
+	return true
 }
 
 // RequestVote RequestVote RPC handler.
@@ -242,6 +319,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 // the struct itself.
 func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool {
 	//fmt.Printf("%d号服务器向%d号服务器发送投票请求\n", rf.me, server)
+	//fmt.Println("SendAppendEntries")
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
 	if reply.VoteGranted {
 		rf.voteRes[server] = true
@@ -267,8 +345,70 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	isLeader := true
 
 	// Your code here (2B).
+	isLeader = rf.curRole == 1
+	// 该节点非leader, todo: followerStart
+	if !isLeader {
+		return index, term, isLeader
+	}
+	// leader节点处理
+	return rf.LeaderStart(command)
+}
 
-	return index, term, isLeader
+func (rf *Raft) LeaderStart(command interface{}) (int, int, bool) {
+
+	// 添加到日志
+	rf.logs = append(rf.logs, LogEntry{
+		Index:   len(rf.logs),
+		Term:    rf.currentTerm,
+		Command: command,
+	})
+	// AppendEntries RPC
+	args := &AppendEntriesArgs{
+		Term:     rf.currentTerm,
+		LeaderId: rf.me,
+		//PrevLogIndex: len(rf.logs) - 2,
+		//PrevLogTerm:  rf.getPrevLogTerm(),
+		Entries:      rf.logs,
+		LeaderCommit: rf.commitIndex,
+	}
+	reply := &AppendEntriesReply{}
+	// 重置日志复制结果
+	for i, _ := range rf.appendEntriesRes {
+		rf.appendEntriesRes[i] = false
+	}
+	// 发送日志
+	for i, _ := range rf.peers {
+		if i == rf.me {
+			continue
+		}
+		go rf.SendAppendEntries(i, args, reply)
+	}
+	res := 0
+	for res <= (len(rf.peers)-1)/2 {
+		res = 0
+		time.Sleep(time.Duration(10) * time.Millisecond)
+		for i, _ := range rf.appendEntriesRes {
+			if rf.appendEntriesRes[i] {
+				res++
+			}
+		}
+	}
+	applyMsg := ApplyMsg{
+		CommandValid: true,
+		Command:      command,
+		CommandIndex: len(rf.logs),
+	}
+	rf.applyCh <- applyMsg
+	rf.commitIndex = applyMsg.CommandIndex
+	return len(rf.logs), rf.currentTerm, true
+}
+
+// leader节点才能调用
+func (rf *Raft) getPrevLogTerm() int {
+	if len(rf.logs) <= 1 {
+		return rf.currentTerm
+	}
+	return rf.logs[len(rf.logs)-2].Term
 }
 
 // the tester doesn't halt goroutines created by Raft after each test,
@@ -368,7 +508,15 @@ func (rf *Raft) candidate() {
 	//fmt.Println(rf.me, ": ", "得到", votes+1, "票")
 	// 当选, 否则继续选举
 	if votes+1 > (len(rf.peers)-1)/2 {
+		// 当选后将nextIndex重置
+		rf.initNextIndex()
 		rf.curRole = 1
+	}
+}
+
+func (rf *Raft) initNextIndex() {
+	for i, _ := range rf.nextIndex {
+		rf.nextIndex[i] = len(rf.logs)
 	}
 }
 
@@ -387,10 +535,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.peers = peers
 	rf.persister = persister
 	rf.me = me
-
+	rf.nextIndex = make([]int, len(peers))
+	rf.appendEntriesRes = make([]bool, len(peers))
 	// Your initialization code here (2A, 2B, 2C).
 	rf.currentTerm = 0
 	rf.commitIndex = 0
+	rf.applyCh = applyCh
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 	// rf.chVotes = make(chan bool, len(rf.peers))
