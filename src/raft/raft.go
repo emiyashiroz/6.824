@@ -265,6 +265,7 @@ func (rf *Raft) SendAppendEntries(server int, args *AppendEntriesArgs, reply *Ap
 		time.Sleep(time.Duration(150) * time.Millisecond)
 	}
 	rf.nextIndex[server] = len(rf.logs)
+	rf.matchIndex[server] = len(rf.logs) - 1
 	rf.appendEntriesRes[server] = true
 	return true
 }
@@ -363,14 +364,14 @@ func (rf *Raft) LeaderStart(command interface{}) (int, int, bool) {
 		Command: command,
 	})
 	// AppendEntries RPC
-	args := &AppendEntriesArgs{
-		Term:     rf.currentTerm,
-		LeaderId: rf.me,
-		//PrevLogIndex: len(rf.logs) - 2,
-		//PrevLogTerm:  rf.getPrevLogTerm(),
-		Entries:      rf.logs,
-		LeaderCommit: rf.commitIndex,
-	}
+	//args := &AppendEntriesArgs{
+	//	Term:     rf.currentTerm,
+	//	LeaderId: rf.me,
+	//	//PrevLogIndex: len(rf.logs) - 2,
+	//	//PrevLogTerm:  rf.getPrevLogTerm(),
+	//	Entries:      rf.logs,
+	//	LeaderCommit: rf.commitIndex,
+	//}
 	reply := &AppendEntriesReply{}
 	// 重置日志复制结果
 	for i, _ := range rf.appendEntriesRes {
@@ -381,7 +382,17 @@ func (rf *Raft) LeaderStart(command interface{}) (int, int, bool) {
 		if i == rf.me {
 			continue
 		}
-		go rf.SendAppendEntries(i, args, reply)
+		// 对每个follower要根据matchindex来设置args中的entries参数, 通过bytescount检查, 这里将不需要的command设置为nil
+		sendArgs := &AppendEntriesArgs{
+			Term:         rf.currentTerm,
+			LeaderId:     rf.me,
+			Entries:      rf.logs,
+			LeaderCommit: rf.commitIndex,
+		}
+		for j := 0; j <= rf.matchIndex[i]; j++ {
+			sendArgs.Entries[j].Command = nil
+		}
+		go rf.SendAppendEntries(i, sendArgs, reply)
 	}
 	res := 0
 	for res <= (len(rf.peers)-1)/2 {
@@ -393,6 +404,7 @@ func (rf *Raft) LeaderStart(command interface{}) (int, int, bool) {
 			}
 		}
 	}
+
 	applyMsg := ApplyMsg{
 		CommandValid: true,
 		Command:      command,
@@ -510,6 +522,7 @@ func (rf *Raft) candidate() {
 	if votes+1 > (len(rf.peers)-1)/2 {
 		// 当选后将nextIndex重置
 		rf.initNextIndex()
+		rf.initMatchIndex()
 		rf.curRole = 1
 	}
 }
@@ -517,6 +530,12 @@ func (rf *Raft) candidate() {
 func (rf *Raft) initNextIndex() {
 	for i, _ := range rf.nextIndex {
 		rf.nextIndex[i] = len(rf.logs)
+	}
+}
+
+func (rf *Raft) initMatchIndex() {
+	for i, _ := range rf.matchIndex {
+		rf.matchIndex[i] = len(rf.logs) - 1
 	}
 }
 
@@ -536,6 +555,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.persister = persister
 	rf.me = me
 	rf.nextIndex = make([]int, len(peers))
+	rf.matchIndex = make([]int, len(peers))
 	rf.appendEntriesRes = make([]bool, len(peers))
 	// Your initialization code here (2A, 2B, 2C).
 	rf.currentTerm = 0
