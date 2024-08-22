@@ -551,7 +551,7 @@ func (cfg *config) wait(index int, n int, startTerm int) interface{} {
 // if retry==true, may submit the command multiple
 // times, in case a leader fails just after Start().
 // if retry==false, calls Start() only once, in order
-// to simplify the early Lab 2B tests.
+// to simplify the early Lab 3B tests.
 func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 	t0 := time.Now()
 	starts := 0
@@ -578,11 +578,9 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 		if index != -1 {
 			// somebody claimed to be the leader and to have
 			// submitted our command; wait a while for agreement.
-			// index = 1
 			t1 := time.Now()
 			for time.Since(t1).Seconds() < 2 {
 				nd, cmd1 := cfg.nCommitted(index)
-				// fmt.Printf("one(%v) nd=%d, cmd1=%v\n", cmd, nd, cmd)
 				if nd > 0 && nd >= expectedServers {
 					// committed
 					if cmd1 == cmd {
@@ -607,7 +605,7 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 
 // start a Test.
 // print the Test message.
-// e.g. cfg.begin("Test (2B): RPC counts aren't too high")
+// e.g. cfg.begin("Test (3B): RPC counts aren't too high")
 func (cfg *config) begin(description string) {
 	fmt.Printf("%s ...\n", description)
 	cfg.t0 = time.Now()

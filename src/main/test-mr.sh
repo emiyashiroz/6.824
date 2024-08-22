@@ -98,7 +98,6 @@ sleep 1
 # wait for the coordinator to exit.
 wait $pid
 
-# test1已通过
 # since workers are required to exit when a job is completely finished,
 # and not before, that means the job has finished.
 sort mr-out* | grep . > mr-wc-all
@@ -141,7 +140,7 @@ else
   echo '---' indexer test: FAIL
   failed_any=1
 fi
-#
+
 wait
 
 #########################################################
@@ -173,9 +172,9 @@ else
 fi
 
 wait
-#
-#
-##########################################################
+
+
+#########################################################
 echo '***' Starting reduce parallelism test.
 
 rm -f mr-*
@@ -197,8 +196,8 @@ else
 fi
 
 wait
-#
-##########################################################
+
+#########################################################
 echo '***' Starting job count test.
 
 rm -f mr-*
@@ -222,10 +221,10 @@ else
 fi
 
 wait
-#
-##########################################################
-## test whether any worker or coordinator exits before the
-## task has completed (i.e., all output files have been finalized)
+
+#########################################################
+# test whether any worker or coordinator exits before the
+# task has completed (i.e., all output files have been finalized)
 rm -f mr-*
 
 echo '***' Starting early exit test.

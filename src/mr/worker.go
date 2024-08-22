@@ -1,171 +1,234 @@
 package mr
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"sort"
+	"strings"
 	"time"
 )
 import "log"
 import "net/rpc"
 import "hash/fnv"
 
-// ByKey for sorting by key.
-type ByKey []KeyValue
-
-// Len for sorting by key.
-func (a ByKey) Len() int           { return len(a) }
-func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
-
-// KeyValue
 // Map functions return a slice of KeyValue.
 type KeyValue struct {
 	Key   string
 	Value string
 }
 
-// use iHash(key) % NReduce to choose the reduce
+type ByKey []KeyValue
+
+func (a ByKey) Len() int           { return len(a) }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
+
+// use ihash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
-func iHash(key string) int {
+func ihash(key string) int {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-// Worker main/mrworker.go calls this function.
-func Worker(mapF func(string, string) []KeyValue,
-	reduceF func(string, []string) string) {
-	for {
-		// 获取任务
-		args := ExampleArgs{}
-		reply := GetTaskReply{}
-		call("Coordinator.GetTask", &args, &reply)
-		// 已经执行完毕
-		if reply.TType == 4 {
-			break
-		}
-		// 任务已经分配完
-		if reply.TType == 2 || reply.TType == 3 {
-			time.Sleep(1)
-			continue
-		}
-		// 执行任务 map
-		if reply.TType == 0 {
-			file, err := os.Open(reply.File)
-			if err != nil {
-				log.Fatalf("cannot open %v, taskId=%d, type=%d, nReduce=%d err=%v", reply.File, reply.TaskId, reply.TType, reply.NReduce, err)
-			}
-			content, err := ioutil.ReadAll(file)
-			if err != nil {
-				log.Fatalf("cannot read %v", reply.File)
-			}
-			file.Close()
-			kva := mapF(reply.File, string(content))
-			kvs := make([][]KeyValue, reply.NReduce)
-			for _, kv := range kva {
-				kvs[iHash(kv.Key)%reply.NReduce] = append(kvs[iHash(kv.Key)%reply.NReduce], kv)
-			}
-			// 生成nReduce个中间文件 命名 mr-taskId-0~9 (when nReduce=10)
-			for i := 0; i < reply.NReduce; i++ {
-				file, err = os.Create(fmt.Sprintf("mr-%d-%d", reply.TaskId, i))
-				if err != nil {
-					log.Fatalf(fmt.Sprintf("mr-%d-%d", reply.TaskId, i), err)
-				}
-				enc := json.NewEncoder(file)
-				for _, kv := range kvs[i] {
-					_ = enc.Encode(&kv)
-				}
-				file.Close()
-			}
-		} else { // reduce
-			n := reply.InputNumber
-			Y := reply.TaskId
-			var kva []KeyValue
-			for i := 0; i < n; i++ {
-				file, _ := os.Open(fmt.Sprintf("mr-%d-%d", i, Y))
-				dec := json.NewDecoder(file)
-				for {
-					var kv KeyValue
-					if err := dec.Decode(&kv); err != nil {
-						break
-					}
-					kva = append(kva, kv)
-				}
-				file.Close()
-			}
-			// 排序
-			sort.Sort(ByKey(kva))
-			// reduceF
-			file, err := ioutil.TempFile("", fmt.Sprintf("tmp%d", rand.Int()))
-			if err != nil {
-				log.Println("tempfile create err", err)
-			}
-			i, j := 0, 0
-			for ; i < len(kva); i++ {
-				j = i + 1
-				values := []string{}
-				for ; j < len(kva); j++ {
-					if kva[i].Key != kva[j].Key {
-						break
-					}
-				}
-				for k := i; k < j; k++ {
-					values = append(values, kva[k].Value)
-				}
-				res := reduceF(kva[i].Key, values) // 这里崩溃
-				_, err = fmt.Fprintf(file, "%v %v\n", kva[i].Key, res)
-				if err != nil {
-					log.Println("tempfile write err", err)
-				}
-				i = j - 1
-			}
-			err = os.Rename(file.Name(), fmt.Sprintf("mr-out-%d", Y))
-			if err != nil {
-				log.Println("tempfile rename err", err)
-			}
-		}
-		// 结束通知
-		completeArgs := CompleteArgs{
-			TType:  reply.TType,
-			TaskId: reply.TaskId,
-		}
-		completeReply := ExampleReply{}
-		call("Coordinator.CompleteTask", &completeArgs, &completeReply)
-	}
+type Workman struct {
+	WorkerID int
+	mapF     func(string, string) []KeyValue
+	reduceF  func(string, []string) string
 }
 
-// CallExample
+func NewWorker(mapF func(string, string) []KeyValue, reduceF func(string, []string) string) *Workman {
+	wm := Workman{
+		WorkerID: os.Getpid(),
+		mapF:     mapF,
+		reduceF:  reduceF,
+	}
+	return &wm
+}
+
+// main/mrworker.go calls this function.
+func Worker(mapf func(string, string) []KeyValue,
+	reducef func(string, []string) string) {
+
+	// Your worker implementation here.
+	wm := NewWorker(mapf, reducef)
+	wm.loop()
+}
+
 // example function to show how to make an RPC call to the coordinator.
+//
 // the RPC argument and reply types are defined in rpc.go.
 func CallExample() {
+
+	// declare an argument structure.
 	args := ExampleArgs{}
+
+	// fill in the argument(s).
 	args.X = 99
+
+	// declare a reply structure.
 	reply := ExampleReply{}
+
+	// send the RPC request, wait for the reply.
+	// the "Coordinator.Example" tells the
+	// receiving server that we'd like to call
+	// the Example() method of struct Coordinator.
 	ok := call("Coordinator.Example", &args, &reply)
 	if ok {
+		// reply.Y should be 100.
 		fmt.Printf("reply.Y %v\n", reply.Y)
 	} else {
 		fmt.Printf("call failed!\n")
 	}
 }
 
+func (w Workman) CallGetTask() (GetTaskReply, error) {
+	args := GetTaskArgs{WorkerID: w.WorkerID}
+	reply := GetTaskReply{}
+	ok := call("Coordinator.GetTask", &args, &reply)
+	if ok {
+		return reply, nil
+	}
+	return GetTaskReply{}, errors.New("call rpc error")
+}
+
+func (w Workman) CallReportTask(taskID int, taskType string) (ReportTaskReply, error) {
+	args := ReportTaskArgs{
+		WorkerID: w.WorkerID,
+		TaskID:   taskID,
+		TaskType: taskType,
+	}
+	reply := ReportTaskReply{}
+	ok := call("Coordinator.ReportTask", &args, &reply)
+	if ok {
+		return reply, nil
+	}
+	return ReportTaskReply{}, errors.New("call rpc error")
+}
+
+func (w Workman) loop() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("recover")
+		}
+	}()
+	for {
+		gres, err := w.CallGetTask()
+		if err != nil || !gres.Success {
+			time.Sleep(time.Second)
+			continue
+		}
+		err = w.handleTask(gres.TaskID, gres.NReduce, gres.MapLength, gres.TaskType, gres.FileName)
+		if err != nil {
+			time.Sleep(time.Second)
+			continue
+		}
+		_, _ = w.CallReportTask(gres.TaskID, gres.TaskType)
+		time.Sleep(time.Second)
+	}
+}
+
+func (w Workman) handleTask(taskID, nReduce, mapLength int, taskType, fileName string) error {
+	if taskType == TaskTypeMap {
+		file, err := os.Open(fileName)
+		if err != nil {
+			return err
+		}
+		content, err := ioutil.ReadAll(file)
+		if err != nil {
+			return err
+		}
+		kva := w.mapF(fileName, string(content))
+		interMediates := make([][]KeyValue, nReduce)
+		for _, kv := range kva {
+			hash := ihash(kv.Key) % nReduce
+			interMediates[hash] = append(interMediates[hash], kv)
+		}
+		for i, interMediate := range interMediates {
+			imfile, err := os.OpenFile(fmt.Sprintf("im-%d", mapLength+taskID*nReduce+i), os.O_RDWR|os.O_CREATE, 0777)
+			if err != nil {
+				return err
+			}
+			for _, kv := range interMediate {
+				_, err = imfile.WriteString(fmt.Sprintf("%v %v\n", kv.Key, kv.Value))
+				if err != nil {
+					return err
+				}
+			}
+			imfile.Close()
+		}
+	} else if taskType == TaskTypeReduce {
+		var intermediate []KeyValue
+		for i := 0; i < mapLength; i++ {
+			imfile, err := os.OpenFile(fmt.Sprintf("im-%d", taskID+i*nReduce), os.O_RDWR|os.O_CREATE, 0777)
+			if err != nil {
+				return err
+			}
+			defer os.Remove(fmt.Sprintf("im-%d", taskID+i*nReduce))
+			defer imfile.Close()
+			content, err := ioutil.ReadAll(imfile)
+			if err != nil {
+				return err
+			}
+			tokens := strings.Split(string(content), "\n")
+			for _, token := range tokens {
+				if len(token) == 0 {
+					continue
+				}
+				xx := strings.Split(token, " ")
+				intermediate = append(intermediate, KeyValue{
+					Key:   xx[0],
+					Value: xx[1],
+				})
+			}
+		}
+		sort.Sort(ByKey(intermediate))
+		oname := fmt.Sprintf("mr-out-%d", taskID)
+		ofile, err := os.Create(oname)
+		if err != nil {
+			return err
+		}
+		defer ofile.Close()
+		i := 0
+		for i < len(intermediate) {
+			j := i + 1
+			for j < len(intermediate) && intermediate[j].Key == intermediate[i].Key {
+				j++
+			}
+			values := []string{}
+			for k := i; k < j; k++ {
+				values = append(values, intermediate[k].Value)
+			}
+			output := w.reduceF(intermediate[i].Key, values)
+
+			// this is the correct format for each line of Reduce output.
+			_, err = fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)
+			if err != nil {
+				return err
+			}
+			i = j
+		}
+	} else {
+		return errors.New("unsupported task type")
+	}
+	return nil
+}
+
 // send an RPC request to the coordinator, wait for the response.
 // usually returns true.
 // returns false if something goes wrong.
-func call(rpcName string, args interface{}, reply interface{}) bool {
+func call(rpcname string, args interface{}, reply interface{}) bool {
 	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
-	sockName := coordinatorSock()
-	c, err := rpc.DialHTTP("unix", sockName)
+	sockname := coordinatorSock()
+	c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
 		log.Fatal("dialing:", err)
 	}
 	defer c.Close()
 
-	err = c.Call(rpcName, args, reply)
+	err = c.Call(rpcname, args, reply)
 	if err == nil {
 		return true
 	}

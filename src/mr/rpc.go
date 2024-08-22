@@ -22,21 +22,32 @@ type ExampleReply struct {
 	Y int
 }
 
-// CompleteArgs 任务完成通知参数
-type CompleteArgs struct {
-	TType  int // 任务类型 0: map; 1: reduce
-	TaskId int // 任务id 用于命名mr-X-Y 和 mr-out-0
+// Add your RPC definitions here.
+
+// get a job
+type GetTaskArgs struct {
+	WorkerID int
 }
 
 type GetTaskReply struct {
-	TType       int    // 请求任务返回结果类型 0: 分配到map; 1: 分配到reduce; 2: 等待map执行完毕  3:等待reduce任务执行完毕 4:所有任务执行完毕
-	TaskId      int    // 任务id 用于命名mr-X-Y 和 mr-out-0
-	File        string // 任务文件名
-	NReduce     int    // nReduce
-	InputNumber int    // 输入文件数
+	Success   bool   // 是否获取到了任务
+	TaskType  string // map or reduce
+	TaskID    int    // 任务ID
+	FileName  string
+	NReduce   int
+	MapLength int
 }
 
-// Add your RPC definitions here.
+// report job finish
+type ReportTaskArgs struct {
+	WorkerID int
+	TaskID   int
+	TaskType string
+}
+
+type ReportTaskReply struct {
+	Success bool
+}
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the coordinator.
