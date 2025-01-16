@@ -7,10 +7,12 @@ type PutAppendArgs struct {
 	// You'll have to add definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
+	UUID string // 请求的唯一ID
 }
 
 type PutAppendReply struct {
 	Value string
+	UUID  string // 请求的唯一ID
 }
 
 type GetArgs struct {
@@ -20,4 +22,11 @@ type GetArgs struct {
 
 type GetReply struct {
 	Value string
+}
+
+type DeleteUUIDArgs struct {
+	UUID string
+}
+
+type DeleteUUIDReply struct {
 }

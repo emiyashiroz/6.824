@@ -16,11 +16,11 @@ package main
 //   -r restart
 
 import "time"
-import "6.5840/diskv"
 import "os"
 import "fmt"
 import "strconv"
 import "runtime"
+import "6.5840/"
 
 func usage() {
 	fmt.Printf("Usage: diskvd -g gid -m master... -s server... -i my-index -d dir\n")
